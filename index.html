@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS System - Fixed Logo Size</title>
+    <link href="https://fonts.googleapis.com/css2?family=Siemreap&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        :root { --meta-blue: #1877F2; --meta-bg: #F0F2F5; --meta-text: #050505; --meta-gray: #65676B; --meta-hover: #E4E6EB; --white: #FFFFFF; --green: #42b72a; --red: #ea4335; --excel-green: #217346; }
+        body { font-family: 'Roboto', 'Siemreap', sans-serif; background-color: var(--meta-bg); margin: 0; display: flex; height: 100vh; overflow: hidden; color: var(--meta-text); }
+        
+        /* SIDEBAR */
+        .sidebar { width: 280px; background-color: var(--white); display: flex; flex-direction: column; border-right: 1px solid #ddd; flex-shrink: 0; box-shadow: 2px 0 5px rgba(0,0,0,0.05); z-index: 10; }
+        .sidebar-header { padding: 20px; font-size: 20px; font-weight: bold; color: var(--meta-blue); border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .client-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .client-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; margin-bottom: 5px; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 500; color: var(--meta-gray); }
+        .client-item:hover { background-color: var(--meta-hover); }
+        .client-item.active { background-color: #E7F3FF; color: var(--meta-blue); font-weight: bold; }
+        .client-name { font-size: 14px; flex: 1; }
+        .client-actions button { background: none; border: none; cursor: pointer; padding: 4px; opacity: 0.6; transition: 0.2s; }
+        .btn-add-client { width: 100%; padding: 12px; background-color: var(--meta-blue); color: white; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        
+        /* MAIN CONTENT */
+        .main-content { flex: 1; display: flex; flex-direction: column; background-color: var(--meta-bg); overflow: hidden; position: relative; }
+        .tabs-header { background-color: var(--white); padding: 10px 20px 0 20px; display: flex; align-items: center; gap: 5px; height: 50px; border-bottom: 1px solid #ddd; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .tab { background-color: transparent; color: var(--meta-gray); padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 10px; border-bottom: 3px solid transparent; transition: 0.2s; }
+        .tab.active { color: var(--meta-blue); border-bottom: 3px solid var(--meta-blue); }
+        .tab-close { font-size: 12px; color: #ccc; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .tab-close:hover { background-color: #ddd; color: var(--red); }
+        .btn-add-tab { background-color: var(--meta-hover); color: var(--meta-text); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-weight: bold; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+
+        /* WORKSPACE */
+        .workspace { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .invoice-container { width: 100%; max-width: 950px; background: white; padding: 30px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); border-radius: 8px; margin-bottom: 80px; }
+        .paper-header { background: linear-gradient(to right, #E7F3FF, #FFFFFF); text-align: center; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #E7F3FF; }
+        .editable-title { margin: 0; font-size: 24px; outline: none; color: var(--meta-blue); font-weight: bold; }
+        
+        /* TABLE STYLES */
+        table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+        th { background-color: #F7F8FA; color: var(--meta-gray); font-weight: bold; height: 40px; border-bottom: 1px solid #ddd; border-right: 1px solid #eee; text-transform: uppercase; font-size: 12px; }
+        td { border-bottom: 1px solid #eee; border-right: 1px solid #eee; padding: 0; position: relative; }
+        tr:last-child td { border-bottom: none; }
+        
+        input[type="number"], input[type="date"] { width: 100%; height: 35px; border: 2px solid transparent; outline: none; background: transparent; font-family: 'Siemreap', sans-serif; text-align: center; color: var(--meta-text); box-sizing: border-box; }
+        .amount-input { text-align: right; padding-right: 10px; font-size: 15px; }
+        .tax-input { width: 60px !important; padding: 0 !important; text-align: center !important; border: 1px solid #ccc !important; border-radius: 4px; background-color: white !important; height: 30px !important; font-weight: bold; }
+        input:focus { border: 2px solid var(--excel-green) !important; background-color: #e8f5e9; z-index: 5; position: relative; }
+        .currency-cell { display: flex; align-items: center; justify-content: space-between; padding-left: 10px; color: #555; height: 100%; }
+        .btn-fill-down { opacity: 0.2; background-color: transparent; border: none; color: var(--meta-gray); cursor: pointer; font-size: 16px; padding: 5px 10px; margin-left: 5px; transition: 0.2s; display: flex; align-items: center; }
+        .currency-cell:hover .btn-fill-down { opacity: 1; color: var(--excel-green); }
+        .btn-fill-down:hover { background-color: #e8f5e9; transform: scale(1.1); font-weight: bold; }
+        .total-column { background-color: #F7F8FA; vertical-align: top; font-weight: bold; font-size: 16px; padding: 20px; color: var(--meta-text); }
+        .result-display { font-size: 24px; color: var(--meta-blue); display: block; margin-top: 10px; font-weight: 800; }
+        
+        /* TOOLBAR */
+        .toolbar { position: fixed; bottom: 20px; right: 20px; background: white; padding: 10px; border-radius: 50px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; gap: 10px; z-index: 999; border: 1px solid #ddd; }
+        .btn { padding: 10px 20px; border: none; border-radius: 20px; cursor: pointer; color: white; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; transition: 0.2s; font-family: 'Siemreap', sans-serif; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-print { background: #444; } .btn-jpg { background: var(--green); } .btn-pdf { background: var(--red); } .btn-excel { background: #16a085; }
+        .btn-invoice { background: linear-gradient(to right, #0064e0, #1877F2); } .btn-telegram { background: #0088cc; }
+
+        /* MODAL */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(255,255,255,0.8); backdrop-filter: blur(5px); justify-content: center; align-items: flex-start; padding-top: 20px; }
+        .modal-content { background-color: white; margin: auto; padding: 40px; border: 1px solid #ddd; width: 800px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; border-radius: 12px; }
+        .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        
+        /* === UPDATED LOGO CSS === */
+        .inv-header { display: flex; justify-content: space-between; margin-bottom: 40px; align-items: flex-start; border-bottom: 2px solid var(--meta-blue); padding-bottom: 20px; }
+        
+        .inv-logo-area { 
+            /* ដកទំហំថេរចេញ ដើម្បីឱ្យវាបត់បែនតាមរូប */
+            width: auto; 
+            height: auto; 
+            max-width: 250px;  /* ទទឹងអតិបរមា */
+            min-width: 100px;  /* ទទឹងអប្បបរមា (ពេលអត់ទាន់មានរូប) */
+            min-height: 100px; /* កម្ពស់អប្បបរមា (ពេលអត់ទាន់មានរូប) */
+            
+            border: 2px dashed #ddd; 
+            border-radius: 8px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            cursor: pointer; 
+            overflow: hidden; 
+            background: #fafafa;
+            padding: 5px;
+        }
+        
+        .inv-logo-area:hover { border-color: var(--meta-blue); }
+        
+        .inv-logo-area img { 
+            max-width: 100%; 
+            max-height: 150px; /* កម្ពស់អតិបរមាកុំឱ្យធំពេក */
+            object-fit: contain; /* រក្សាសមាមាត្ររូបភាព */
+        }
+        /* ======================== */
+
+        .tg-config { display: none; background: white; padding: 25px; border-radius: 12px; border: 1px solid #ddd; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3000; box-shadow: 0 5px 20px rgba(0,0,0,0.15); width: 320px; }
+        .tg-config input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        
+        @media print {
+            .sidebar, .tabs-header, .toolbar, .btn-add-tab, .close-modal, .invoice-actions, .tg-config, .btn-fill-down { display: none !important; }
+            .modal { position: static; background: white; padding: 0; display: block !important; }
+            .modal-content { width: 100%; box-shadow: none; border: none; margin: 0; padding: 0; }
+            .workspace { display: none; }
+            body { background: white; height: auto; overflow: visible; }
+            input:focus { border: none !important; background: transparent; }
+            /* ពេល Print ឲ្យបាត់ border dashed របស់ logo */
+            .inv-logo-area { border: none; background: transparent; }
+            .inv-logo-text { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header">POS System</div>
+        <div class="client-list" id="clientList"></div>
+        
+        <div class="add-client-container">
+            <button class="btn-add-client" onclick="addNewClient()">+ ភ្ញៀវថ្មី (New Client)</button>
+        </div>
+
+        <div class="sidebar-footer">
+            <div style="font-size: 11px; color: #888; font-weight: bold; margin-bottom: 5px;">SYSTEM DATA</div>
+            <button class="btn-backup" onclick="backupData()">📥 Backup Data</button>
+            <button class="btn-restore" onclick="document.getElementById('restoreInput').click()">📤 Restore Data</button>
+            <input type="file" id="restoreInput" style="display:none" onchange="restoreData(this)" accept=".json">
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="tabs-header" id="tabsHeader"></div>
+        <div class="workspace">
+            <div class="invoice-container" id="invoiceArea">
+                <div class="paper-header"><h1 id="pageTitle" class="editable-title" contenteditable="true" oninput="markUnsaved()">Daily Boost Cost Page</h1></div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">No</th>
+                            <th>Amount Spend ($)</th>
+                            <th>Date</th>
+                            <th style="width: 200px;">Total:</th>
+                            <th style="width: 200px;">
+                                Tax <input type="number" id="taxRate" class="tax-input" value="0" oninput="markUnsaved(); calculateTotal()"> %
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="invoiceModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeInvoice()">×</span>
+            <div id="finalInvoicePaper" style="background: white; padding: 20px;">
+                <div class="inv-header">
+                    <div class="inv-logo-area" onclick="document.getElementById('logoInput').click()">
+                        <img id="invLogoImg" src="" style="display: none;">
+                        <div class="inv-logo-text" id="invLogoText">Upload Logo</div>
+                        <input type="file" id="logoInput" style="display: none;" accept="image/*" onchange="handleLogoUpload(this)">
+                    </div>
+                    <div style="text-align: right; flex: 1;">
+                        <div style="font-size: 32px; font-weight: 800; color: #1877F2; margin-bottom: 10px;">INVOICE</div>
+                        <div style="color: #666;">Invoice #: <span contenteditable="true" style="color: #000; font-weight: bold;">INV-001</span></div>
+                        <div style="color: #666;">Date: <span contenteditable="true" id="invDate" style="color: #000; font-weight: bold;"></span></div>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
+                    <div style="width: 45%;">
+                        <div style="font-weight: bold; color: #65676B; text-transform: uppercase; font-size: 12px; margin-bottom: 5px;">From:</div>
+                        <div contenteditable="true" id="invFromInfo" style="line-height: 1.6;"><b>ឈ្មោះហាងរបស់អ្នក</b><br>Phone: 012 345 678</div>
+                    </div>
+                    <div style="width: 45%;">
+                        <div style="font-weight: bold; color: #65676B; text-transform: uppercase; font-size: 12px; margin-bottom: 5px;">Bill To:</div>
+                        <div contenteditable="true" id="invClientName" style="line-height: 1.6;">Client Name</div>
+                    </div>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <thead><tr><th style="background-color: #1877F2; color: white; padding: 12px; text-align: left;">Description</th><th style="background-color: #1877F2; color: white; padding: 12px; text-align: right;">Amount</th></tr></thead>
+                    <tbody><tr><td style="padding: 12px; border-bottom: 1px solid #eee;" contenteditable="true" id="invDesc">Service Charge</td><td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;" id="invSubTotal">$0.00</td></tr></tbody>
+                </table>
+                <div style="float: right; width: 300px;">
+                    <div style="display: flex; justify-content: space-between; padding: 5px 0;"><span>Subtotal:</span><span id="invSubTotal2">$0.00</span></div>
+                    <div style="display: flex; justify-content: space-between; padding: 5px 0;"><span>Tax (<span id="invTaxRate">0</span>%):</span><span id="invTaxAmount">$0.00</span></div>
+                    <div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 2px solid #1877F2; color: #1877F2; font-size: 20px; font-weight: bold;"><span>Grand Total:</span><span id="invGrandTotal">$0.00</span></div>
+                </div>
+                <div style="clear: both; height: 60px;"></div>
+                <div style="text-align: center;"><hr style="width: 150px; margin: auto; border-top: 1px solid #333;"><div style="margin-top: 5px; font-size: 12px; font-weight: bold;">Authorized Signature</div></div>
+            </div>
+            <div style="margin-top: 30px; display: flex; justify-content: center; gap: 10px;" class="no-print">
+                <button class="btn btn-print" onclick="window.print()">🖨️ Print</button>
+                <button class="btn btn-jpg" onclick="saveInvoiceJPG()">🖼️ JPG</button>
+                <button class="btn btn-pdf" onclick="saveInvoicePDF()">📄 PDF</button>
+                <button class="btn btn-telegram" onclick="sendInvoiceTelegram()">✈️ Telegram</button>
+                <button class="btn" style="background:#888;" onclick="configureTelegram()">⚙️ Config</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tgConfigModal" class="tg-config">
+        <h3>Telegram Settings</h3>
+        <input type="text" id="tgBotToken" placeholder="Bot Token">
+        <input type="text" id="tgChatId" placeholder="Default/Owner Chat ID">
+        <div style="text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
+            <button class="btn" style="background: #e4e6eb; color: black;" onclick="document.getElementById('tgConfigModal').style.display='none'">Cancel</button>
+            <button class="btn btn-invoice" onclick="saveTgConfig()">Save Changes</button>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <button class="btn btn-invoice" onclick="openInvoice()">📄 Create Invoice</button>
+        <div style="width: 1px; background: #ddd; height: 30px; margin: 0 5px;"></div>
+        <button class="btn btn-print" onclick="window.print()">🖨️ Print Table</button>
+        <button class="btn btn-jpg" onclick="saveAsJPG()">🖼️ Table JPG</button>
+        <button class="btn btn-excel" onclick="saveAsExcel()">📊 Excel</button>
+    </div>
+
+    <script>
+        let dataStore = JSON.parse(localStorage.getItem('posSystemSeparatedV2')) || {};
+        let clientConfigs = JSON.parse(localStorage.getItem('posClientConfigs')) || {}; 
+        let currentClient = null; let currentTab = null; const totalDays = 31;
+        let globalLogo = localStorage.getItem('globalShopLogo') || "";
+        let globalFromInfo = localStorage.getItem('globalFromInfo') || "<b>ឈ្មោះហាងរបស់អ្នក</b><br>Phone: 012 345 678";
+
+        document.addEventListener('DOMContentLoaded', () => {
+            generateTableHTML(); renderClientList();
+            const clients = Object.keys(dataStore); if (clients.length > 0) selectClient(clients[0]); else clearUI();
+        });
+
+        // --- BACKUP & RESTORE ---
+        function backupData() {
+            const backup = { dataStore: dataStore, clientConfigs: clientConfigs, globalShopLogo: localStorage.getItem('globalShopLogo'), globalFromInfo: localStorage.getItem('globalFromInfo'), tgBotToken: localStorage.getItem('tgBotToken'), tgChatId: localStorage.getItem('tgChatId') };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "pos_backup_" + new Date().toISOString().split('T')[0] + ".json");
+            document.body.appendChild(downloadAnchorNode); downloadAnchorNode.click(); downloadAnchorNode.remove();
+        }
+        function restoreData(input) {
+            const file = input.files[0]; if (!file) return;
+            if(!confirm("Restore data? Current data will be replaced!")) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const backup = JSON.parse(e.target.result);
+                    if(backup.dataStore) localStorage.setItem('posSystemSeparatedV2', JSON.stringify(backup.dataStore));
+                    if(backup.clientConfigs) localStorage.setItem('posClientConfigs', JSON.stringify(backup.clientConfigs));
+                    if(backup.globalShopLogo) localStorage.setItem('globalShopLogo', backup.globalShopLogo);
+                    if(backup.globalFromInfo) localStorage.setItem('globalFromInfo', backup.globalFromInfo);
+                    if(backup.tgBotToken) localStorage.setItem('tgBotToken', backup.tgBotToken);
+                    if(backup.tgChatId) localStorage.setItem('tgChatId', backup.tgChatId);
+                    alert("Restore Successful!"); location.reload();
+                } catch (err) { alert("Invalid File!"); }
+            }; reader.readAsText(file);
+        }
+
+        // --- MAIN FUNCTIONS ---
+        function renderClientList() {
+            const list = document.getElementById('clientList'); list.innerHTML = '';
+            Object.keys(dataStore).forEach(name => {
+                const tgId = clientConfigs[name] ? clientConfigs[name] : '';
+                const hasTg = tgId ? '<span style="color:#42b72a; font-weight:bold;">●</span>' : '';
+                const div = document.createElement('div'); div.className = `client-item ${name === currentClient ? 'active' : ''}`;
+                div.innerHTML = `<div class="client-name" onclick="selectClient('${name}')">${name} ${hasTg}</div><div class="client-actions"><button onclick="editClientInfo('${name}')">✏️</button><button onclick="deleteClient('${name}')" style="color:#ea4335;">🗑</button></div>`;
+                list.appendChild(div);
+            });
+        }
+        function addNewClient() { const name = prompt("ឈ្មោះភ្ញៀវថ្មី:"); if(!name || dataStore[name]) return; const tgId = prompt("Telegram Chat ID (Optional):", ""); dataStore[name] = {}; dataStore[name][getDefaultTabName()] = createEmptyData(name); if(tgId) clientConfigs[name] = tgId; saveToStorage(); renderClientList(); selectClient(name); }
+        function editClientInfo(oldName) {
+            const currentTg = clientConfigs[oldName] || ""; const newName = prompt("កែឈ្មោះភ្ញៀវ:", oldName); if (newName === null) return;
+            const newTg = prompt("កែ Telegram Chat ID:", currentTg); const validName = (newName && newName !== oldName) ? newName : oldName;
+            if (newName && newName !== oldName) { if (dataStore[newName]) return alert("ឈ្មោះថ្មីនេះមានរួចហើយ!"); dataStore[newName] = dataStore[oldName]; delete dataStore[oldName]; if(clientConfigs[oldName]) { clientConfigs[newName] = clientConfigs[oldName]; delete clientConfigs[oldName]; } if (currentClient === oldName) currentClient = newName; }
+            if (newTg !== null) clientConfigs[validName] = newTg.trim(); saveToStorage(); renderClientList(); if(currentClient === validName) document.getElementById('pageTitle').innerText = dataStore[validName][currentTab].title;
+        }
+        function deleteClient(name) { if(confirm("លុបមែនទេ?")) { delete dataStore[name]; delete clientConfigs[name]; if(currentClient===name){currentClient=null; currentTab=null; clearUI();} saveToStorage(); renderClientList(); } }
+
+        function selectClient(name) { saveCurrentData(); currentClient = name; renderClientList(); renderTabs(); const tabs = Object.keys(dataStore[name]); if(tabs.length) selectTab(tabs[tabs.length-1]); else addNewTab(); }
+        function renderTabs() { const c = document.getElementById('tabsHeader'); c.innerHTML = ''; if(!currentClient) return; Object.keys(dataStore[currentClient]).forEach(t => { const d = document.createElement('div'); d.className = `tab ${t===currentTab?'active':''}`; d.innerHTML = `<span>${t}</span><span class="tab-close" onclick="event.stopPropagation(); deleteTab('${t}')">×</span>`; d.onclick = ()=>selectTab(t); d.ondblclick = () => renameTab(t); c.appendChild(d); }); const b = document.createElement('button'); b.className='btn-add-tab'; b.innerHTML='+'; b.onclick=addNewTab; c.appendChild(b); }
+        function addNewTab(){ const n = prompt("ឈ្មោះ Tab:", getDefaultTabName()); if(n && !dataStore[currentClient][n]) { saveCurrentData(); dataStore[currentClient][n] = createEmptyData(currentClient); saveToStorage(); renderTabs(); selectTab(n); } }
+        function selectTab(t){ saveCurrentData(); currentTab=t; renderTabs(); loadTableData(dataStore[currentClient][t]); }
+        function deleteTab(t){ if(confirm("លុប Tab?")) { delete dataStore[currentClient][t]; saveToStorage(); if(currentTab===t){ const k=Object.keys(dataStore[currentClient]); if(k.length) selectTab(k[k.length-1]); else {currentTab=null; clearTableInputs(); renderTabs();}} else renderTabs(); } }
+        function renameTab(old){ const n=prompt("ឈ្មោះថ្មី:", old); if(n && !dataStore[currentClient][n]){ dataStore[currentClient][n]=dataStore[currentClient][old]; delete dataStore[currentClient][old]; currentTab=n; saveToStorage(); renderTabs(); } }
+        function createEmptyData(name) { const d={}; const t=new Date(); const y=t.getFullYear(); const m=(t.getMonth()+1).toString().padStart(2,'0'); for(let i=1;i<=totalDays;i++) d[i]=`${y}-${m}-${i.toString().padStart(2,'0')}`; return {title:`${name} - Cost`, tax:0, amounts:{}, dates:d}; }
+        function saveCurrentData(){ if(!currentClient||!currentTab)return; const d={title:document.getElementById('pageTitle').innerText, tax:document.getElementById('taxRate').value, amounts:{}, dates:{}}; document.querySelectorAll('.amount-input').forEach(i=>{if(i.value)d.amounts[i.dataset.index]=i.value}); document.querySelectorAll('.date-input').forEach(i=>{if(i.value)d.dates[i.dataset.index]=i.value}); dataStore[currentClient][currentTab]=d; saveToStorage(); }
+        function loadTableData(d){ if(!d)return; document.getElementById('pageTitle').innerText=d.title; document.getElementById('taxRate').value=d.tax; clearTableInputs(); Object.keys(d.amounts).forEach(k=>{const i=document.querySelector(`.amount-input[data-index="${k}"]`); if(i)i.value=d.amounts[k]}); Object.keys(d.dates).forEach(k=>{const i=document.querySelector(`.date-input[data-index="${k}"]`); if(i)i.value=d.dates[k]}); calculateTotal(); }
+        function saveToStorage(){ localStorage.setItem('posSystemSeparatedV2', JSON.stringify(dataStore)); localStorage.setItem('posClientConfigs', JSON.stringify(clientConfigs)); }
+        function clearUI(){document.getElementById('tabsHeader').innerHTML=''; clearTableInputs(); calculateTotal();}
+        function clearTableInputs(){document.querySelectorAll('.amount-input').forEach(i=>i.value='');}
+        function getDefaultTabName(){const d=new Date(); return `ខែ${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getFullYear()}`;}
+        function markUnsaved(){saveCurrentData();}
+
+        function generateTableHTML(){ 
+            const b=document.getElementById('tableBody'); 
+            let h=''; 
+            for(let i=1;i<=totalDays;i++){ 
+                h+=`<tr>
+                    <td>${i}</td>
+                    <td>
+                        <div class="currency-cell">
+                            <span>$</span>
+                            <input type="number" step="0.01" class="amount-input" data-index="${i}" 
+                                oninput="markUnsaved();calculateTotal()" 
+                                onchange="this.value=parseFloat(this.value||0).toFixed(2);saveCurrentData()"
+                                onkeydown="moveFocus(event, ${i})">
+                            <button class="btn-fill-down" onclick="fillValuesDown(${i})" title="Copy Down All">⬇</button>
+                        </div>
+                    </td>
+                    <td><input type="date" class="date-input" data-index="${i}" oninput="markUnsaved()"></td>`; 
+                if(i===1) h+=`<td rowspan="${totalDays}" class="total-column"><div style="position:sticky;top:10px;text-align:center;">Subtotal:<br><span id="subTotalDisplay" class="result-display">$0.00</span></div></td><td rowspan="${totalDays}" class="total-column"><div style="position:sticky;top:10px;text-align:center;">Tax:<br><span id="taxAmountDisplay" class="result-display" style="color:#000;font-size:18px;">$0.00</span><hr style="border-color:#ddd;margin:15px 0;">Total:<br><span id="grandTotalDisplay" class="result-display">$0.00</span></div></td>`; 
+                h+='</tr>'; 
+            } 
+            b.innerHTML=h; 
+        }
+
+        function moveFocus(event, currentIndex) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                const nextIndex = currentIndex + 1;
+                const nextInput = document.querySelector(`.amount-input[data-index="${nextIndex}"]`);
+                if (nextInput) { nextInput.focus(); nextInput.select(); }
+            }
+        }
+
+        function fillValuesDown(startIndex) {
+            const sourceInput = document.querySelector(`input[data-index="${startIndex}"]`);
+            const val = sourceInput.value;
+            if (!val) return; 
+            if(confirm("តើអ្នកចង់ Copy តម្លៃ $" + val + " នេះទៅគ្រប់ថ្ងៃខាងក្រោមមែនទេ? (Fill All Down)")) {
+                for (let i = startIndex + 1; i <= totalDays; i++) {
+                    const targetInput = document.querySelector(`input[data-index="${i}"]`);
+                    if (targetInput) targetInput.value = parseFloat(val).toFixed(2);
+                }
+                saveCurrentData(); calculateTotal();
+            }
+        }
+
+        function calculateTotal(){ let s=0; document.querySelectorAll('.amount-input').forEach(i=>s+=parseFloat(i.value)||0); let t=parseFloat(document.getElementById('taxRate').value)||0; let tv=s*(t/100); document.getElementById('subTotalDisplay').textContent='$'+s.toFixed(2); document.getElementById('taxAmountDisplay').textContent='$'+tv.toFixed(2); document.getElementById('grandTotalDisplay').textContent='$'+(s+tv).toFixed(2); }
+        function openInvoice() { if (!currentClient) return alert("សូមជ្រើសរើសភ្ញៀវជាមុនសិន!"); let sub = 0; document.querySelectorAll('.amount-input').forEach(i => sub += parseFloat(i.value) || 0); let taxRate = parseFloat(document.getElementById('taxRate').value) || 0; let taxVal = sub * (taxRate/100); let grand = sub + taxVal; document.getElementById('invDate').innerText = new Date().toLocaleDateString('en-GB'); document.getElementById('invClientName').innerHTML = `<b>${currentClient}</b><br>Address...`; document.getElementById('invDesc').innerText = `សេវាកម្ម Boost Page - ${currentTab || ''}`; document.getElementById('invSubTotal').innerText = '$' + sub.toFixed(2); document.getElementById('invSubTotal2').innerText = '$' + sub.toFixed(2); document.getElementById('invTaxRate').innerText = taxRate; document.getElementById('invTaxAmount').innerText = '$' + taxVal.toFixed(2); document.getElementById('invGrandTotal').innerText = '$' + grand.toFixed(2); if(globalLogo) { document.getElementById('invLogoImg').src = globalLogo; document.getElementById('invLogoImg').style.display = 'block'; document.getElementById('invLogoText').style.display = 'none'; } document.getElementById('invFromInfo').innerHTML = globalFromInfo; document.getElementById('invoiceModal').style.display = 'flex'; }
+        function closeInvoice() { globalFromInfo = document.getElementById('invFromInfo').innerHTML; localStorage.setItem('globalFromInfo', globalFromInfo); document.getElementById('invoiceModal').style.display = 'none'; }
+        function handleLogoUpload(input) { if (input.files && input.files[0]) { const reader = new FileReader(); reader.onload = function(e) { const result = e.target.result; document.getElementById('invLogoImg').src = result; document.getElementById('invLogoImg').style.display = 'block'; document.getElementById('invLogoText').style.display = 'none'; localStorage.setItem('globalShopLogo', result); globalLogo = result; }; reader.readAsDataURL(input.files[0]); } }
+        function saveInvoiceJPG() { html2canvas(document.getElementById('finalInvoicePaper'), { scale: 2 }).then(canvas => { const link = document.createElement('a'); link.download = `Invoice-${currentClient}.jpg`; link.href = canvas.toDataURL("image/jpeg"); link.click(); }); }
+        function saveInvoicePDF() { html2canvas(document.getElementById('finalInvoicePaper'), { scale: 2 }).then(canvas => { const imgData = canvas.toDataURL('image/png'); const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4'); const w = pdf.internal.pageSize.getWidth(); const h = (canvas.height * w) / canvas.width; pdf.addImage(imgData, 'PNG', 0, 0, w, h); pdf.save(`Invoice-${currentClient}.pdf`); }); }
+        async function sendInvoiceTelegram() { const token = localStorage.getItem('tgBotToken'); const ownerChatId = localStorage.getItem('tgChatId'); let targetChatId = clientConfigs[currentClient]; if (!token) return configureTelegram(); if (!targetChatId) { const useOwner = confirm(`ភ្ញៀវនេះមិនទាន់មាន Chat ID។ ផ្ញើចូល Group របស់អ្នក (${ownerChatId}) វិញទេ?`); if(useOwner && ownerChatId) targetChatId = ownerChatId; else return; } const btn = document.querySelector('.btn-telegram'); const oldText = btn.innerText; btn.innerText = "Sending..."; btn.disabled = true; try { const element = document.getElementById('finalInvoicePaper'); const canvas = await html2canvas(element, { scale: 2 }); canvas.toBlob(async (blob) => { const formData = new FormData(); formData.append('chat_id', targetChatId); formData.append('photo', blob, `invoice-${Date.now()}.jpg`); formData.append('caption', `Invoice for ${currentClient} | Date: ${new Date().toLocaleDateString()}`); const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: formData }); const result = await response.json(); if (result.ok) alert("✅ Sent!"); else alert("❌ Failed: " + result.description); btn.innerText = oldText; btn.disabled = false; }, 'image/jpeg'); } catch (error) { alert("Error sending."); btn.innerText = oldText; btn.disabled = false; } }
+        function configureTelegram() { document.getElementById('tgBotToken').value = localStorage.getItem('tgBotToken') || ''; document.getElementById('tgChatId').value = localStorage.getItem('tgChatId') || ''; document.getElementById('tgConfigModal').style.display = 'block'; }
+        function saveTgConfig() { localStorage.setItem('tgBotToken', document.getElementById('tgBotToken').value.trim()); localStorage.setItem('tgChatId', document.getElementById('tgChatId').value.trim()); document.getElementById('tgConfigModal').style.display = 'none'; }
+        function saveAsExcel() { if(!currentClient)return; const t=document.getElementById('taxRate').value; let d=[["No","Amount","Date","","Summary"]]; const am=document.querySelectorAll('.amount-input'); const da=document.querySelectorAll('.date-input'); let s=0; am.forEach(i=>s+=parseFloat(i.value)||0); let tv=s*(t/100); for(let i=0;i<totalDays;i++){ let r=[i+1, parseFloat(am[i].value)||0, da[i].value, ""]; if(i===0)r.push(`Sub: $${s.toFixed(2)}`); else if(i===1)r.push(`Tax: $${tv.toFixed(2)}`); else if(i===2)r.push(`Total: $${(s+tv).toFixed(2)}`); d.push(r); } const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(d), "Sheet1"); XLSX.writeFile(wb, `${currentClient}-${currentTab}.xlsx`); }
+        function saveAsJPG(){html2canvas(document.getElementById('invoiceArea'),{scale:2}).then(c=>{const a=document.createElement('a');a.download=`${currentClient}.jpg`;a.href=c.toDataURL("image/jpeg");a.click()})}
+    </script>
+</body>
+</html>
